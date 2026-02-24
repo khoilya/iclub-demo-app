@@ -1,0 +1,29 @@
+{
+  "name": "iclub-demo-app",
+  "version": "1.0.0",
+  "description": "ICLUB hybrid mobile demo app — investment form with AI WebRTC call",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khoilya/iclub-demo-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/khoilya/iclub-demo-app/issues"
+  },
+  "homepage": "https://github.com/khoilya/iclub-demo-app#readme",
+  "devDependencies": {
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  }
+}
