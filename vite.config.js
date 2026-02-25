@@ -8,5 +8,14 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
+    proxy: {
+      // Dev-only same-origin proxy to avoid browser CORS preflight failures.
+      '/newo-api': {
+        target: 'https://app.newo.ai',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/newo-api/, ''),
+      },
+    },
   },
 });

@@ -28,6 +28,57 @@ const statusBanner  = document.getElementById('status-banner');
 
 let callPopupShown   = false;   // ensure the popup appears only once
 let widgetInitialised = false;  // initialise the widget only once
+let widgetInitRetryCount = 0;
+const widgetApiBaseUrl = import.meta.env.DEV ? '/newo-api' : 'https://app.newo.ai';
+
+function logWidget(level, message, details) {
+  const timestamp = new Date().toISOString();
+  const prefix = `[WebCallWidget][${timestamp}] ${message}`;
+  const logger = typeof console[level] === 'function' ? console[level] : console.log;
+
+  if (typeof details === 'undefined') {
+    logger.call(console, prefix);
+    return;
+  }
+
+  logger.call(console, prefix, details);
+}
+
+function findStartAudioCallButton() {
+  const buttons = Array.from(document.querySelectorAll('button'));
+  return buttons.find((button) => {
+    const text = (button.textContent || '').trim().toLowerCase();
+    return text.includes('start audio call') || text === 'start call';
+  });
+}
+
+function autoStartWidgetCall() {
+  const maxAttempts = 20;
+  const retryDelayMs = 120;
+  let attempts = 0;
+
+  const tryClickStart = () => {
+    attempts += 1;
+
+    const startButton = findStartAudioCallButton();
+    if (startButton && !startButton.disabled) {
+      logWidget('info', 'auto-start: clicking widget start call button', { attempts });
+      startButton.click();
+      return;
+    }
+
+    if (attempts >= maxAttempts) {
+      logWidget('warn', 'auto-start skipped: start call button not found in time', {
+        attempts,
+      });
+      return;
+    }
+
+    setTimeout(tryClickStart, retryDelayMs);
+  };
+
+  setTimeout(tryClickStart, 0);
+}
 
 // ─── Newo Widget Helpers ─────────────────────────────────────────────────────
 
@@ -36,20 +87,61 @@ let widgetInitialised = false;  // initialise the widget only once
  * Safe to call multiple times — only executes once.
  */
 function initWidget() {
-  if (widgetInitialised) return;
+  if (widgetInitialised) {
+    logWidget('info', 'init skipped: already initialised');
+    return;
+  }
+
+  logWidget('info', 'init attempt started', {
+    documentReadyState: document.readyState,
+    hasWidgetGlobal: typeof window.WebCallWidget !== 'undefined',
+    retryCount: widgetInitRetryCount,
+    apiBaseUrl: widgetApiBaseUrl,
+    note: 'Client-side logs appear in browser DevTools console, not web server terminal.',
+  });
+
   if (typeof window.WebCallWidget === 'undefined') {
-    console.warn('Newo WebCallWidget script not loaded yet — retrying in 500 ms');
+    widgetInitRetryCount += 1;
+    logWidget('warn', 'script not loaded yet; retrying in 500 ms', {
+      retryCount: widgetInitRetryCount,
+      widgetScriptUrl: 'https://cdn.newo.ai/webcall-widget/widget.umd.min.js',
+    });
     setTimeout(initWidget, 500);
     return;
   }
-  window.WebCallWidget.init({
-    target:         '#call-widget-container',
-    showButton:     false,
-    customerIdn:    'DEMO',
-    connectorIdn:   'DEMO',
-    externalActorId:'DEMO_USER',
-  });
-  widgetInitialised = true;
+
+  const initConfig = {
+    target: '#call-widget-container',
+    showButton: false,
+    theme: 'dark',
+    defaultMode: 'audio',
+    useOnlyAudio: true,
+    customerIdn: 'NEs8DGW1Zx',
+    connectorIdn: 'newo_voice_connector',
+    externalActorId: crypto.randomUUID(),
+    apiBaseUrl: widgetApiBaseUrl,
+    useLogger: true,
+    onReady: () => {
+      logWidget('info', 'widget onReady fired');
+    },
+  };
+
+  const initStartedAt = performance.now();
+  logWidget('info', 'calling init(config)', initConfig);
+
+  try {
+    window.WebCallWidget.init(initConfig);
+    widgetInitialised = true;
+    widgetInitRetryCount = 0;
+    logWidget('info', 'init success', {
+      durationMs: Math.round(performance.now() - initStartedAt),
+    });
+  } catch (error) {
+    logWidget('error', 'init failed', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+  }
 }
 
 /**
@@ -73,8 +165,30 @@ function startAICall() {
   // Simulate passing context to the Socket API
   console.log('Simulating Socket API Payload with Form Context', formPayload);
 
+  logWidget('info', 'startAICall invoked; ensuring widget is initialised');
   initWidget();
-  window.WebCallWidget.open('audio');
+
+  if (typeof window.WebCallWidget === 'undefined') {
+    logWidget('error', "open('audio') skipped: WebCallWidget is unavailable");
+    return;
+  }
+
+  if (typeof window.WebCallWidget.open !== 'function') {
+    logWidget('error', "open('audio') skipped: WebCallWidget.open is not a function");
+    return;
+  }
+
+  logWidget('info', "calling open('audio')");
+  try {
+    window.WebCallWidget.open('audio');
+    logWidget('info', "open('audio') success");
+    autoStartWidgetCall();
+  } catch (error) {
+    logWidget('error', "open('audio') failed", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+  }
 }
 
 // ─── SIP Transfer Simulation ─────────────────────────────────────────────────

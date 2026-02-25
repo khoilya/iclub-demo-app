@@ -107,9 +107,12 @@ npx cap run android --livereload --external
 window.WebCallWidget.init({
   target:          '#call-widget-container',
   showButton:      false,
-  customerIdn:     'DEMO',
-  connectorIdn:    'DEMO',
-  externalActorId: 'DEMO_USER',
+  customerIdn:     'YOUR_CUSTOMER_IDN',
+  connectorIdn:    'newo_voice_connector',
+  externalActorId: crypto.randomUUID(),
+  // In dev, /newo-api is proxied by Vite to https://app.newo.ai
+  apiBaseUrl:      import.meta.env.DEV ? '/newo-api' : 'https://app.newo.ai',
+  useLogger:       true,
 });
 
 // Before calling .open(), collect form data and log it
