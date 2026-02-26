@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>ICLUB — Investment Form</title>
+
+    <!-- TailwindCSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                DEFAULT: '#6366f1',
+                dark: '#4338ca',
+                light: '#a5b4fc',
+              },
+            },
+          },
+        },
+      };
+    </script>
+
+    <!-- Newo Web Call Widget -->
+    <script src="https://cdn.newo.ai/webcall-widget/widget.umd.min.js"></script>
+
+    <style>
+      /* Prevent pull-to-refresh on mobile */
+      body { overscroll-behavior-y: contain; }
+
+      /* Smooth focus ring */
+      input:focus, select:focus { outline: none; }
+
+      /* Pulse animation for the call avatar */
+      @keyframes pulse-ring {
+        0%   { transform: scale(0.9); opacity: 0.8; }
+        50%  { transform: scale(1.15); opacity: 0.3; }
+        100% { transform: scale(0.9); opacity: 0.8; }
+      }
+      .pulse-ring { animation: pulse-ring 1.5s ease-in-out infinite; }
+
+      /* SIP transfer animation */
+      @keyframes slide-in {
+        from { transform: translateY(20px); opacity: 0; }
+        to   { transform: translateY(0);    opacity: 1; }
+      }
+      .slide-in { animation: slide-in 0.4s ease-out forwards; }
+    </style>
+    <script type="module" crossorigin src="/iclub-demo-app/assets/index-VzrrF7Hz.js"></script>
+  </head>
+
+  <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-start py-8 px-4">
+
+    <!-- ── App Shell ── -->
+    <div class="w-full max-w-md">
+
+      <!-- Header -->
+      <div class="flex items-center gap-3 mb-8">
+        <div class="w-10 h-10 rounded-xl bg-brand flex items-center justify-center shadow-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">ICLUB</h1>
+          <p class="text-xs text-slate-400">Investment Portal</p>
+        </div>
+      </div>
+
+      <!-- Investment Form Card -->
+      <div class="bg-slate-800 rounded-2xl shadow-2xl p-6">
+        <h2 class="text-lg font-semibold mb-1">Start Your Investment</h2>
+        <p class="text-sm text-slate-400 mb-6">Fill in the details below and our AI consultant will guide you.</p>
+
+        <form id="investment-form" novalidate class="space-y-4">
+
+          <!-- Full Name -->
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5" for="full-name">Full Name</label>
+            <input
+              id="full-name"
+              name="fullName"
+              type="text"
+              placeholder="John Smith"
+              autocomplete="name"
+              class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-sm placeholder-slate-500 focus:border-brand focus:ring-2 focus:ring-brand/30 transition"
+            />
+          </div>
+
+          <!-- Email -->
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5" for="email">Email Address</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              placeholder="john@example.com"
+              autocomplete="email"
+              class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-sm placeholder-slate-500 focus:border-brand focus:ring-2 focus:ring-brand/30 transition"
+            />
+          </div>
+
+          <!-- Investment Amount — focusing this field triggers the AI call popup -->
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5" for="amount">
+              Investment Amount
+              <span class="ml-1 text-brand text-[10px] uppercase tracking-wide">(triggers AI consultant)</span>
+            </label>
+            <div class="relative">
+              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+              <input
+                id="amount"
+                name="amount"
+                type="number"
+                min="100"
+                placeholder="5,000"
+                class="w-full bg-slate-700 border border-slate-600 rounded-xl pl-8 pr-4 py-3 text-sm placeholder-slate-500 focus:border-brand focus:ring-2 focus:ring-brand/30 transition"
+              />
+            </div>
+          </div>
+
+          <!-- Investment Goal -->
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5" for="goal">Investment Goal</label>
+            <select
+              id="goal"
+              name="goal"
+              class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/30 transition appearance-none"
+            >
+              <option value="">Select a goal…</option>
+              <option value="retirement">Retirement Planning</option>
+              <option value="growth">Portfolio Growth</option>
+              <option value="income">Passive Income</option>
+              <option value="preservation">Capital Preservation</option>
+            </select>
+          </div>
+
+          <!-- Risk Tolerance -->
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5" for="risk">Risk Tolerance</label>
+            <select
+              id="risk"
+              name="riskTolerance"
+              class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/30 transition appearance-none"
+            >
+              <option value="">Select risk level…</option>
+              <option value="conservative">Conservative</option>
+              <option value="moderate">Moderate</option>
+              <option value="aggressive">Aggressive</option>
+            </select>
+          </div>
+
+          <!-- Submit -->
+          <button
+            type="submit"
+            class="w-full mt-2 bg-brand hover:bg-brand-dark active:scale-95 transition-all rounded-xl py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand/30"
+          >
+            Submit Application
+          </button>
+
+        </form>
+      </div>
+
+      <!-- Status Banner (shown after form submit) -->
+      <div id="status-banner" class="hidden mt-4 bg-emerald-600/20 border border-emerald-500/40 rounded-xl px-4 py-3 text-sm text-emerald-300 text-center slide-in">
+        ✅ Application submitted successfully!
+      </div>
+
+    </div><!-- /App Shell -->
+
+    <!-- ─────────────────────────────────────────────────────────
+         AI Consultant Call Popup
+    ───────────────────────────────────────────────────────── -->
+    <div
+      id="call-popup"
+      class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end justify-center z-50 px-4 pb-8"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="popup-title"
+    >
+      <div class="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl p-6 space-y-5">
+
+        <!-- Caller info -->
+        <div class="flex items-center gap-4">
+          <div class="relative">
+            <div class="w-14 h-14 rounded-full bg-brand flex items-center justify-center text-2xl">🤖</div>
+            <div class="absolute inset-0 rounded-full bg-brand pulse-ring"></div>
+          </div>
+          <div>
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Inbound Call</p>
+            <p id="popup-title" class="font-semibold text-base">AI Investment Consultant</p>
+            <p class="text-xs text-slate-400">ICLUB · Powered by Newo AI</p>
+          </div>
+        </div>
+
+        <!-- Question -->
+        <p class="text-sm text-slate-300 leading-relaxed">
+          Are you comfortable speaking with an <strong class="text-white">AI consultant</strong> now to discuss your investment?
+        </p>
+
+        <!-- Actions -->
+        <div class="flex gap-3">
+          <button
+            id="btn-decline"
+            class="flex-1 bg-slate-700 hover:bg-slate-600 active:scale-95 transition-all rounded-xl py-3 text-sm font-medium text-slate-300"
+          >
+            Not Now
+          </button>
+          <button
+            id="btn-accept"
+            class="flex-1 bg-brand hover:bg-brand-dark active:scale-95 transition-all rounded-xl py-3 text-sm font-semibold text-white shadow-lg shadow-brand/30"
+          >
+            Yes, Connect Me
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ─────────────────────────────────────────────────────────
+         SIP Transfer Status Overlay
+    ───────────────────────────────────────────────────────── -->
+    <div
+      id="sip-overlay"
+      class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-4"
+    >
+      <div class="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl p-8 text-center space-y-4 slide-in">
+        <div class="text-5xl">📞</div>
+        <h3 class="text-lg font-semibold">Transferring to Human Agent</h3>
+        <p class="text-sm text-slate-400">Transferring via SIP to human agent…</p>
+        <div class="flex justify-center gap-1 pt-1">
+          <span class="w-2 h-2 rounded-full bg-brand animate-bounce [animation-delay:0ms]"></span>
+          <span class="w-2 h-2 rounded-full bg-brand animate-bounce [animation-delay:150ms]"></span>
+          <span class="w-2 h-2 rounded-full bg-brand animate-bounce [animation-delay:300ms]"></span>
+        </div>
+        <p id="sip-status" class="text-xs text-slate-500"></p>
+        <button
+          id="btn-sip-close"
+          class="hidden mt-2 w-full bg-slate-700 hover:bg-slate-600 active:scale-95 transition-all rounded-xl py-3 text-sm font-medium"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- Newo Widget container (invisible host element) -->
+    <div id="call-widget-container"></div>
+
+  </body>
+</html>
