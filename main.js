@@ -116,7 +116,7 @@ function initWidget() {
     theme: 'dark',
     defaultMode: 'audio',
     useOnlyAudio: true,
-    customerIdn: 'NEs8DGW1Zx',
+    customerIdn: 'C_NE_UBL1JSPF',
     connectorIdn: 'newo_voice_connector',
     externalActorId: crypto.randomUUID(),
     apiBaseUrl: widgetApiBaseUrl,
