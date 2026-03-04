@@ -39,7 +39,7 @@
       }
       .pulse-ring { animation: pulse-ring 1.5s ease-in-out infinite; }
 
-      /* SIP transfer animation */
+      /* Slide-in animation */
       @keyframes slide-in {
         from { transform: translateY(20px); opacity: 0; }
         to   { transform: translateY(0);    opacity: 1; }
@@ -80,6 +80,7 @@
               id="full-name"
               name="fullName"
               type="text"
+              required
               placeholder="John Smith"
               autocomplete="name"
               class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-sm placeholder-slate-500 focus:border-brand focus:ring-2 focus:ring-brand/30 transition"
@@ -106,6 +107,7 @@
               id="phone"
               name="phone"
               type="tel"
+              required
               placeholder="+1 (555) 123-4567"
               autocomplete="tel"
               class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-sm placeholder-slate-500 focus:border-brand focus:ring-2 focus:ring-brand/30 transition"
@@ -206,6 +208,71 @@
     </div>
 
     <!-- ─────────────────────────────────────────────────────────
+         In-App Debug Logs
+    ───────────────────────────────────────────────────────── -->
+    <div
+      class="fixed right-4 z-30 flex items-center gap-2"
+      style="top: calc(env(safe-area-inset-top, 0px) + 14px);"
+    >
+      <button
+        id="btn-open-call"
+        type="button"
+        class="bg-brand hover:bg-brand-dark text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg shadow-lg"
+      >
+        Talk to AI Assistant
+      </button>
+      <button
+        id="btn-debug-open"
+        type="button"
+        class="bg-slate-800/95 border border-slate-500 text-slate-100 text-xs font-semibold px-3 py-2 rounded-lg shadow-lg"
+      >
+        Logs
+      </button>
+    </div>
+
+    <div
+      id="debug-panel"
+      class="hidden fixed inset-x-3 bottom-4 z-[60]"
+      style="top: calc(env(safe-area-inset-top, 0px) + 58px);"
+      role="dialog"
+      aria-modal="false"
+      aria-label="Debug logs"
+    >
+      <div class="h-full bg-slate-900/95 border border-slate-600 rounded-2xl shadow-2xl backdrop-blur p-3 flex flex-col">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <p class="text-xs uppercase tracking-wide text-slate-300">Debug Logs</p>
+          <div class="flex items-center gap-2">
+            <button
+              id="btn-debug-copy"
+              type="button"
+              class="text-[11px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded-md"
+            >
+              Copy
+            </button>
+            <button
+              id="btn-debug-clear"
+              type="button"
+              class="text-[11px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded-md"
+            >
+              Clear
+            </button>
+            <button
+              id="btn-debug-close"
+              type="button"
+              class="text-[11px] bg-rose-700 hover:bg-rose-600 px-2 py-1 rounded-md"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+        <pre
+          id="debug-log-output"
+          class="flex-1 overflow-auto bg-black/50 border border-slate-700 rounded-xl p-3 text-[11px] leading-relaxed text-emerald-300 whitespace-pre-wrap"
+        ></pre>
+      </div>
+    </div>
+
+    <!-- ─────────────────────────────────────────────────────────
          AI Consultant Call Popup
     ───────────────────────────────────────────────────────── -->
     <div
@@ -255,28 +322,42 @@
     </div>
 
     <!-- ─────────────────────────────────────────────────────────
-         SIP Transfer Status Overlay
+         Outbound Callback Consent Popup (after submit)
     ───────────────────────────────────────────────────────── -->
     <div
-      id="sip-overlay"
-      class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-4"
+      id="callback-popup"
+      class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end justify-center z-50 px-4 pb-8"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="callback-popup-title"
     >
-      <div class="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl p-8 text-center space-y-4 slide-in">
-        <div class="text-5xl">📞</div>
-        <h3 class="text-lg font-semibold">Transferring to Human Agent</h3>
-        <p class="text-sm text-slate-400">Transferring via SIP to human agent…</p>
-        <div class="flex justify-center gap-1 pt-1">
-          <span class="w-2 h-2 rounded-full bg-brand animate-bounce [animation-delay:0ms]"></span>
-          <span class="w-2 h-2 rounded-full bg-brand animate-bounce [animation-delay:150ms]"></span>
-          <span class="w-2 h-2 rounded-full bg-brand animate-bounce [animation-delay:300ms]"></span>
+      <div class="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl p-6 space-y-5">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-full bg-brand flex items-center justify-center text-xl">📲</div>
+          <div>
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Application Submitted</p>
+            <p id="callback-popup-title" class="font-semibold text-base">AI Consultant Callback</p>
+          </div>
         </div>
-        <p id="sip-status" class="text-xs text-slate-500"></p>
-        <button
-          id="btn-sip-close"
-          class="hidden mt-2 w-full bg-slate-700 hover:bg-slate-600 active:scale-95 transition-all rounded-xl py-3 text-sm font-medium"
-        >
-          Close
-        </button>
+
+        <p class="text-sm text-slate-300 leading-relaxed">
+          Is it okay if our <strong class="text-white">AI Consultant</strong> calls you back after this form submission?
+        </p>
+
+        <div class="flex gap-3">
+          <button
+            id="btn-callback-no"
+            class="flex-1 bg-slate-700 hover:bg-slate-600 active:scale-95 transition-all rounded-xl py-3 text-sm font-medium text-slate-300"
+          >
+            No, Thanks
+          </button>
+          <button
+            id="btn-callback-yes"
+            class="flex-1 bg-brand hover:bg-brand-dark active:scale-95 transition-all rounded-xl py-3 text-sm font-semibold text-white shadow-lg shadow-brand/30"
+          >
+            Yes, Call Me
+          </button>
+        </div>
       </div>
     </div>
 

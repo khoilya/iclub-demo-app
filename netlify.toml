@@ -8,6 +8,12 @@
   force = true
 
 [[redirects]]
+  from = "/callback-webhook"
+  to = "https://hooks.newo.ai/UYFns5IzFhXs3Yi89vUTlg"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

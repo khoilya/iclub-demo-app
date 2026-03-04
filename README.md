@@ -13,7 +13,8 @@ A hybrid mobile **Proof-of-Concept** for ICLUB: an investment form with an AI-po
 | Direct WebRTC Call | No widget dependency, no WebSocket API dependency |
 | Newo REST Signaling | `tokens/embedded` + `ice` + `call` endpoints |
 | Call Controls | In-call status bar with **End Call** button |
-| SIP Transfer Simulation | UI status sequence after lead qualification |
+| In-App Debug Logs | Mobile-visible logs panel with Copy/Clear actions |
+| Submit Callback Flow | After valid submit (`name` + `phone`), asks consent and sends outbound callback webhook |
 | Android Packaging | Capacitor wraps the app into a native APK |
 
 ---
@@ -23,8 +24,8 @@ A hybrid mobile **Proof-of-Concept** for ICLUB: an investment form with an AI-po
 ```text
 iclub-demo-app/
 |- index.html          # Mobile-first UI (TailwindCSS via CDN)
-|- main.js             # App logic (form, popup, direct WebRTC, SIP transfer)
-|- vite.config.js      # Vite configuration (+ dev proxy for /newo-api)
+|- main.js             # App logic (form, popup, direct WebRTC)
+|- vite.config.js      # Vite configuration (+ dev proxies for /newo-api and /callback-webhook)
 |- capacitor.config.js # Capacitor configuration
 `- package.json
 ```
@@ -50,7 +51,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 3. Click **Yes, Connect Me**.
 4. The app starts a direct WebRTC audio call via Newo REST signaling APIs.
 5. Use **End Call** anytime from the active-call control bar.
-6. After ~8 seconds, a SIP transfer overlay appears (simulated hand-off).
+6. Submit form (name + phone required), then confirm callback consent in popup.
 
 ---
 
@@ -74,20 +75,27 @@ You can configure these values in `.env` / build env:
 VITE_NEWO_API_BASE_URL=https://app.newo.ai
 VITE_NEWO_CUSTOMER_IDN=C_NE_UBL1JSPF
 VITE_NEWO_CONNECTOR_IDN=newo_voice_connector
+VITE_OUTBOUND_WEBHOOK_URL=https://hooks.newo.ai/UYFns5IzFhXs3Yi89vUTlg
 ```
 
 Runtime behavior:
 
 - Native (Capacitor): defaults to `https://app.newo.ai`.
 - Browser dev: defaults to `/newo-api` (proxied by `vite.config.js`).
+- Outbound callback webhook:
+  - Native defaults to `https://hooks.newo.ai/UYFns5IzFhXs3Yi89vUTlg`.
+  - Browser defaults to `/callback-webhook` (proxied by `vite.config.js` / `netlify.toml`) to avoid CORS.
+- Build asset paths:
+  - `pnpm build` uses relative assets (`./assets/...`) for Android/iOS builds.
+  - `pnpm build:gh` uses `/iclub-demo-app/...` for GitHub Pages.
 
 ---
 
 ## Deployment Notes
 
 - Browser environments may hit CORS restrictions unless proxied or allowlisted.
-- Mobile builds should use direct API base URL (default behavior in this app).
-- `vite.config.js` keeps a `/newo-api` proxy for local browser development.
+- Mobile builds use direct API base URL (default behavior in this app) and use Capacitor native HTTP for signaling calls to bypass WebView CORS.
+- `vite.config.js` keeps `/newo-api` and `/callback-webhook` proxies for local browser development.
 
 ---
 
@@ -151,7 +159,7 @@ const jwt = await fetch('/api/v1/webrtc-provider/tokens/embedded', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     customer_idn: 'C_NE_UBL1JSPF',
-    connector_idn: 'newo_voice_connector',
+    connector_idn: 'newo_voice_connector_web',
     external_actor_id: crypto.randomUUID(),
   }),
 }).then((r) => r.json()).then((r) => r.jwt);

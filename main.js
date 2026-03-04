@@ -1,3 +1,5 @@
+import { CapacitorHttp } from '@capacitor/core';
+
 /**
  * ICLUB Demo App — main.js
  *
@@ -5,26 +7,33 @@
  *  1. Wait for the user to focus the 4th form field (Investment Amount).
  *  2. Show the "AI consultant call" popup.
  *  3. If accepted, create a direct WebRTC session using Newo signaling APIs.
- *  4. After a simulated qualification delay, show the SIP-transfer overlay.
  */
 
 // DOM References
 const form = document.getElementById('investment-form');
 const amountInput = document.getElementById('amount');
+const fullNameInput = document.getElementById('full-name');
+const phoneInput = document.getElementById('phone');
 
 const callPopup = document.getElementById('call-popup');
 const btnAccept = document.getElementById('btn-accept');
 const btnDecline = document.getElementById('btn-decline');
-
-const sipOverlay = document.getElementById('sip-overlay');
-const sipStatus = document.getElementById('sip-status');
-const btnSipClose = document.getElementById('btn-sip-close');
+const btnOpenCall = document.getElementById('btn-open-call');
+const callbackPopup = document.getElementById('callback-popup');
+const btnCallbackYes = document.getElementById('btn-callback-yes');
+const btnCallbackNo = document.getElementById('btn-callback-no');
 
 const statusBanner = document.getElementById('status-banner');
 const remoteAudio = document.getElementById('remote-audio');
 const callControls = document.getElementById('call-controls');
 const callStatusText = document.getElementById('call-status-text');
 const btnHangup = document.getElementById('btn-hangup');
+const btnDebugOpen = document.getElementById('btn-debug-open');
+const debugPanel = document.getElementById('debug-panel');
+const btnDebugClose = document.getElementById('btn-debug-close');
+const btnDebugClear = document.getElementById('btn-debug-clear');
+const btnDebugCopy = document.getElementById('btn-debug-copy');
+const debugLogOutput = document.getElementById('debug-log-output');
 
 // Configuration
 const isNativePlatform = Boolean(window?.Capacitor?.isNativePlatform?.());
@@ -33,11 +42,14 @@ const apiBaseUrl =
   (isNativePlatform ? 'https://app.newo.ai' : '/newo-api');
 
 const customerIdn = import.meta.env.VITE_NEWO_CUSTOMER_IDN || 'C_NE_UBL1JSPF';
-const connectorIdn = import.meta.env.VITE_NEWO_CONNECTOR_IDN || 'newo_voice_connector';
+const connectorIdn = import.meta.env.VITE_NEWO_CONNECTOR_IDN || 'newo_voice_connector_web';
+const outboundWebhookUrl =
+  import.meta.env.VITE_OUTBOUND_WEBHOOK_URL ||
+  (isNativePlatform
+    ? 'https://hooks.newo.ai/UYFns5IzFhXs3Yi89vUTlg'
+    : '/callback-webhook');
 
 // State
-let callPopupShown = false;
-
 const callSession = {
   externalActorId: crypto.randomUUID(),
   isStarting: false,
@@ -49,8 +61,13 @@ const callSession = {
   remoteStream: null,
 };
 
-let sipTransferTimerId = null;
 let isTearingDownCall = false;
+let callPopupTriggerTimerId = null;
+let hasAutoCallPopupShown = false;
+let pendingSubmissionPayload = null;
+let isSendingCallbackWebhook = false;
+const inAppLogs = [];
+const maxInAppLogs = 300;
 
 class CallCancelledError extends Error {
   constructor() {
@@ -63,6 +80,7 @@ function logWebRtc(level, message, details) {
   const timestamp = new Date().toISOString();
   const prefix = `[DirectWebRTC][${timestamp}] ${message}`;
   const logger = typeof console[level] === 'function' ? console[level] : console.log;
+  appendInAppLog(level, message, details);
 
   if (typeof details === 'undefined') {
     logger.call(console, prefix);
@@ -70,6 +88,109 @@ function logWebRtc(level, message, details) {
   }
 
   logger.call(console, prefix, details);
+}
+
+function formatLogDetails(details) {
+  if (typeof details === 'undefined' || details === null) {
+    return '';
+  }
+
+  if (details instanceof Error) {
+    return JSON.stringify({
+      name: details.name,
+      message: details.message,
+      stack: details.stack,
+    });
+  }
+
+  if (typeof details === 'string') {
+    return details;
+  }
+
+  try {
+    return JSON.stringify(details);
+  } catch {
+    return String(details);
+  }
+}
+
+function isMicrophonePermissionError(error) {
+  const name =
+    error && typeof error === 'object' && 'name' in error ? String(error.name || '') : '';
+  const message = error instanceof Error ? error.message : String(error || '');
+
+  return (
+    /NotAllowedError|PermissionDeniedError|SecurityError/i.test(name) ||
+    /permission denied|permission|microphone/i.test(message)
+  );
+}
+
+function renderInAppLogs() {
+  if (!debugLogOutput) {
+    return;
+  }
+
+  debugLogOutput.textContent = inAppLogs.join('\n');
+  debugLogOutput.scrollTop = debugLogOutput.scrollHeight;
+}
+
+function appendInAppLog(level, message, details) {
+  const timestamp = new Date().toISOString();
+  const normalizedLevel = String(level).toLowerCase();
+  const detailText = formatLogDetails(details);
+  const line = detailText
+    ? `${timestamp} [${normalizedLevel.toUpperCase()}] ${message} | ${detailText}`
+    : `${timestamp} [${normalizedLevel.toUpperCase()}] ${message}`;
+
+  inAppLogs.push(line);
+  if (inAppLogs.length > maxInAppLogs) {
+    inAppLogs.shift();
+  }
+
+  renderInAppLogs();
+
+  if (normalizedLevel === 'error' && debugPanel?.classList.contains('hidden')) {
+    openDebugPanel();
+  }
+}
+
+function openDebugPanel() {
+  if (!debugPanel) {
+    return;
+  }
+
+  debugPanel.classList.remove('hidden');
+}
+
+function closeDebugPanel() {
+  if (!debugPanel) {
+    return;
+  }
+
+  debugPanel.classList.add('hidden');
+}
+
+function clearDebugLogs() {
+  inAppLogs.length = 0;
+  renderInAppLogs();
+  appendInAppLog('info', 'Debug logs cleared');
+}
+
+async function copyDebugLogsToClipboard() {
+  const content = inAppLogs.length > 0 ? inAppLogs.join('\n') : 'No logs captured yet.';
+
+  try {
+    if (!navigator.clipboard?.writeText) {
+      throw new Error('Clipboard API unavailable');
+    }
+
+    await navigator.clipboard.writeText(content);
+    appendInAppLog('info', 'Copied debug logs to clipboard');
+  } catch (error) {
+    appendInAppLog('error', 'Copy debug logs failed', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 function showCallControls(statusText) {
@@ -99,34 +220,170 @@ function setCallStatusText(statusText) {
   callStatusText.textContent = statusText;
 }
 
-function clearSipTransferTimer() {
-  if (sipTransferTimerId === null) {
+function showStatusBanner(kind, message) {
+  const successClasses = ['bg-emerald-600/20', 'border-emerald-500/40', 'text-emerald-300'];
+  const errorClasses = ['bg-rose-600/20', 'border-rose-500/40', 'text-rose-300'];
+
+  statusBanner.classList.remove(...successClasses, ...errorClasses, 'hidden');
+
+  if (kind === 'error') {
+    statusBanner.classList.add(...errorClasses);
+    statusBanner.textContent = `⚠️ ${message}`;
+  } else {
+    statusBanner.classList.add(...successClasses);
+    statusBanner.textContent = `✅ ${message}`;
+  }
+
+  statusBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function resetRequiredFieldValidation() {
+  fullNameInput?.setCustomValidity('');
+  phoneInput?.setCustomValidity('');
+}
+
+function validateRequiredFields(formPayload) {
+  resetRequiredFieldValidation();
+
+  const name = String(formPayload.fullName ?? fullNameInput?.value ?? '').trim();
+  const phone = String(formPayload.phone ?? phoneInput?.value ?? '').trim();
+  const missingFields = [];
+
+  if (!name) {
+    missingFields.push('Full Name');
+    fullNameInput?.setCustomValidity('Full Name is required');
+  }
+
+  if (!phone) {
+    missingFields.push('Phone Number');
+    phoneInput?.setCustomValidity('Phone Number is required');
+  }
+
+  if (missingFields.length > 0) {
+    if (!name) {
+      fullNameInput?.reportValidity();
+    } else {
+      phoneInput?.reportValidity();
+    }
+
+    resetRequiredFieldValidation();
+    return {
+      valid: false,
+      missingFields,
+    };
+  }
+
+  resetRequiredFieldValidation();
+  return {
+    valid: true,
+    missingFields: [],
+  };
+}
+
+function prettifyFieldName(fieldName) {
+  const fieldMap = {
+    email: 'Email',
+    amount: 'Investment Amount',
+    goal: 'Investment Goal',
+    riskTolerance: 'Risk Tolerance',
+  };
+
+  if (fieldMap[fieldName]) {
+    return fieldMap[fieldName];
+  }
+
+  return fieldName
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/^./, (match) => match.toUpperCase());
+}
+
+function buildOtherFieldsSummary(formPayload) {
+  const otherFields = Object.entries(formPayload).filter(
+    ([fieldName]) => fieldName !== 'fullName' && fieldName !== 'phone'
+  );
+
+  if (otherFields.length === 0) {
+    return 'No additional fields were provided.';
+  }
+
+  return otherFields
+    .map(([fieldName, rawValue]) => {
+      const value = String(rawValue || '').trim() || 'not provided';
+      return `${prettifyFieldName(fieldName)}: ${value}`;
+    })
+    .join('; ');
+}
+
+function buildOutboundCallbackContent(formPayload) {
+  const name = String(formPayload.fullName || '').trim();
+  const phone = String(formPayload.phone || '').trim();
+  const otherFieldsSummary = buildOtherFieldsSummary(formPayload);
+
+  return `Call a user named ${name} on ${phone}. He filled up the submission form in the iclub application. The information user passed to the form: ${otherFieldsSummary}. During conversation follow the **Outbound call after application form is completed** scenario.`;
+}
+
+function showCallbackPopup() {
+  if (!callbackPopup) {
     return;
   }
 
-  window.clearTimeout(sipTransferTimerId);
-  sipTransferTimerId = null;
+  setCallbackPopupBusyState(false);
+  callbackPopup.classList.remove('hidden');
+  callbackPopup.classList.add('flex');
 }
 
-function hideSIPOverlay() {
-  sipOverlay.classList.add('hidden');
-  sipOverlay.classList.remove('flex');
-  btnSipClose.classList.add('hidden');
-  sipStatus.textContent = '';
+function hideCallbackPopup() {
+  if (!callbackPopup) {
+    return;
+  }
+
+  setCallbackPopupBusyState(false);
+  callbackPopup.classList.add('hidden');
+  callbackPopup.classList.remove('flex');
 }
 
-function scheduleSIPTransfer() {
-  clearSipTransferTimer();
+function setCallbackPopupBusyState(isBusy) {
+  if (btnCallbackYes) {
+    btnCallbackYes.disabled = isBusy;
+    btnCallbackYes.classList.toggle('opacity-60', isBusy);
+    btnCallbackYes.textContent = isBusy ? 'Sending...' : 'Yes, Call Me';
+  }
 
-  sipTransferTimerId = window.setTimeout(() => {
-    sipTransferTimerId = null;
+  if (btnCallbackNo) {
+    btnCallbackNo.disabled = isBusy;
+    btnCallbackNo.classList.toggle('opacity-60', isBusy);
+  }
+}
 
-    if (!callSession.isStarting && !callSession.isInCall) {
-      return;
-    }
+async function sendOutboundCallbackWebhook(formPayload) {
+  const content = buildOutboundCallbackContent(formPayload);
+  const webhookBody = {
+    arguments: [
+      {
+        name: 'content',
+        value: content,
+      },
+      {
+        name: 'taskTypes',
+        value: '["make_call"]',
+      },
+    ],
+  };
 
-    simulateSIPTransfer();
-  }, 8000);
+  logWebRtc('info', 'Sending outbound callback webhook', webhookBody);
+  const webhookResponse = await fetchJson(outboundWebhookUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(webhookBody),
+    includeMeta: true,
+  });
+
+  logWebRtc('info', 'Outbound callback webhook response', {
+    status: webhookResponse.status,
+    body: webhookResponse.data,
+  });
 }
 
 function ensureActiveCallStart(attemptId) {
@@ -161,7 +418,59 @@ function parseApiError(payload, fallbackStatusText) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
+  const { includeMeta = false, ...requestOptions } = options;
+  const method = String(requestOptions.method || 'GET').toUpperCase();
+
+  if (isNativePlatform) {
+    const headers = requestOptions.headers || {};
+    const contentType = String(headers['Content-Type'] || headers['content-type'] || '');
+    let data = undefined;
+
+    appendInAppLog('info', 'HTTP request (native)', { method, url });
+
+    if (typeof requestOptions.body !== 'undefined') {
+      if (typeof requestOptions.body === 'string' && contentType.includes('application/json')) {
+        try {
+          data = JSON.parse(requestOptions.body);
+        } catch {
+          data = requestOptions.body;
+        }
+      } else {
+        data = requestOptions.body;
+      }
+    }
+
+    const response = await CapacitorHttp.request({
+      url,
+      method,
+      headers,
+      data,
+      responseType: 'json',
+    });
+
+    appendInAppLog('info', 'HTTP response (native)', {
+      method,
+      url,
+      status: response.status,
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      const message = parseApiError(response.data, `${response.status}`);
+      throw new Error(`Request failed: ${message}`);
+    }
+
+    if (includeMeta) {
+      return {
+        status: response.status,
+        data: response.data,
+      };
+    }
+
+    return response.data;
+  }
+
+  appendInAppLog('info', 'HTTP request (web)', { method, url });
+  const response = await fetch(url, requestOptions);
   let payload = null;
 
   try {
@@ -170,9 +479,22 @@ async function fetchJson(url, options = {}) {
     payload = null;
   }
 
+  appendInAppLog('info', 'HTTP response (web)', {
+    method,
+    url,
+    status: response.status,
+  });
+
   if (!response.ok) {
     const message = parseApiError(payload, `${response.status} ${response.statusText}`);
     throw new Error(`Request failed: ${message}`);
+  }
+
+  if (includeMeta) {
+    return {
+      status: response.status,
+      data: payload,
+    };
   }
 
   return payload;
@@ -299,9 +621,6 @@ function teardownCallSession() {
 
   isTearingDownCall = true;
   try {
-    clearSipTransferTimer();
-    hideSIPOverlay();
-
     callSession.startAttemptId += 1;
     callSession.isStarting = false;
     callSession.isInCall = false;
@@ -441,9 +760,8 @@ async function startAICall() {
   callSession.isStarting = true;
   callSession.isInCall = false;
   showCallControls('Connecting to AI consultant...');
-  hideSIPOverlay();
 
-  console.log('Starting direct WebRTC call with form context', formPayload);
+  logWebRtc('info', 'Starting direct WebRTC call with form context', formPayload);
 
   try {
     const jwt = await requestEmbeddedToken(callMetadata);
@@ -458,6 +776,7 @@ async function startAICall() {
     ensureActiveCallStart(attemptId);
     callSession.peerConnection = peerConnection;
 
+    logWebRtc('info', 'Requesting microphone access');
     const localStream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: false,
@@ -486,12 +805,18 @@ async function startAICall() {
     });
 
     setCallStatusText('Connected. Tap End Call whenever needed.');
-    scheduleSIPTransfer();
     logWebRtc('info', 'Direct WebRTC call established');
   } catch (error) {
     if (error instanceof CallCancelledError) {
       logWebRtc('info', 'Call start cancelled');
       return;
+    }
+
+    if (isMicrophonePermissionError(error)) {
+      logWebRtc(
+        'error',
+        'Microphone permission denied. Enable Microphone for ICLUB Demo in Android Settings > Apps > ICLUB Demo > Permissions.'
+      );
     }
 
     logWebRtc('error', 'Direct WebRTC call failed', {
@@ -504,37 +829,11 @@ async function startAICall() {
   }
 }
 
-function simulateSIPTransfer() {
-  btnSipClose.classList.add('hidden');
-  sipOverlay.classList.remove('hidden');
-  sipOverlay.classList.add('flex');
-
-  const steps = [
-    { delay: 0, text: 'Connecting to SIP gateway...' },
-    { delay: 1500, text: 'Routing to available agent...' },
-    { delay: 3000, text: 'Agent connected. Have a great conversation!' },
-  ];
-
-  steps.forEach(({ delay, text }) => {
-    setTimeout(() => {
-      sipStatus.textContent = text;
-      if (text.includes('Agent connected')) {
-        btnSipClose.classList.remove('hidden');
-      }
-    }, delay);
-  });
-}
-
-btnSipClose.addEventListener('click', () => {
-  hideSIPOverlay();
-});
-
 function showCallPopup() {
-  if (callPopupShown) {
+  if (!callPopup.classList.contains('hidden')) {
     return;
   }
 
-  callPopupShown = true;
   callPopup.classList.remove('hidden');
   callPopup.classList.add('flex');
 }
@@ -542,6 +841,47 @@ function showCallPopup() {
 function hideCallPopup() {
   callPopup.classList.add('hidden');
   callPopup.classList.remove('flex');
+}
+
+function clearPendingCallPopupTrigger() {
+  if (callPopupTriggerTimerId === null) {
+    return;
+  }
+
+  window.clearTimeout(callPopupTriggerTimerId);
+  callPopupTriggerTimerId = null;
+}
+
+function requestCallPopup(source, delayMs = 0, options = {}) {
+  const { autoFromAmount = false } = options;
+
+  if (autoFromAmount && hasAutoCallPopupShown) {
+    return;
+  }
+
+  if (!callPopup.classList.contains('hidden')) {
+    return;
+  }
+
+  if (callPopupTriggerTimerId !== null) {
+    return;
+  }
+
+  logWebRtc('info', 'queueing call popup trigger', { source, delayMs });
+
+  callPopupTriggerTimerId = window.setTimeout(() => {
+    callPopupTriggerTimerId = null;
+
+    if (autoFromAmount && hasAutoCallPopupShown) {
+      return;
+    }
+
+    if (autoFromAmount) {
+      hasAutoCallPopupShown = true;
+    }
+
+    showCallPopup();
+  }, delayMs);
 }
 
 btnAccept.addEventListener('click', () => {
@@ -553,8 +893,60 @@ btnDecline.addEventListener('click', () => {
   hideCallPopup();
 });
 
+btnCallbackNo?.addEventListener('click', () => {
+  hideCallbackPopup();
+  pendingSubmissionPayload = null;
+  showStatusBanner('success', 'Application submitted. Callback request skipped.');
+});
+
+btnCallbackYes?.addEventListener('click', async () => {
+  if (!pendingSubmissionPayload || isSendingCallbackWebhook) {
+    return;
+  }
+
+  isSendingCallbackWebhook = true;
+  setCallbackPopupBusyState(true);
+
+  try {
+    await sendOutboundCallbackWebhook(pendingSubmissionPayload);
+    hideCallbackPopup();
+    showStatusBanner('success', 'Application submitted. AI callback request was sent.');
+    pendingSubmissionPayload = null;
+    logWebRtc('info', 'Outbound callback webhook completed');
+  } catch (error) {
+    showStatusBanner('error', 'Application submitted, but callback request failed.');
+    logWebRtc('error', 'Outbound callback webhook failed', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+  } finally {
+    isSendingCallbackWebhook = false;
+    setCallbackPopupBusyState(false);
+  }
+});
+
+btnOpenCall?.addEventListener('click', () => {
+  requestCallPopup('manual-button', 0);
+});
+
 btnHangup?.addEventListener('click', () => {
   stopAICall();
+});
+
+btnDebugOpen?.addEventListener('click', () => {
+  openDebugPanel();
+});
+
+btnDebugClose?.addEventListener('click', () => {
+  closeDebugPanel();
+});
+
+btnDebugClear?.addEventListener('click', () => {
+  clearDebugLogs();
+});
+
+btnDebugCopy?.addEventListener('click', () => {
+  copyDebugLogsToClipboard();
 });
 
 callPopup.addEventListener('click', (event) => {
@@ -563,19 +955,78 @@ callPopup.addEventListener('click', (event) => {
   }
 });
 
+callbackPopup?.addEventListener('click', (event) => {
+  if (event.target === callbackPopup && !isSendingCallbackWebhook) {
+    hideCallbackPopup();
+    pendingSubmissionPayload = null;
+    showStatusBanner('success', 'Application submitted. Callback request skipped.');
+  }
+});
+
 amountInput.addEventListener('focus', () => {
   // Small delay so the keyboard has time to appear before the popup.
-  setTimeout(showCallPopup, 400);
+  requestCallPopup('focus', 400, { autoFromAmount: true });
+});
+
+amountInput.addEventListener('pointerup', () => {
+  requestCallPopup('pointerup', 180, { autoFromAmount: true });
+});
+
+amountInput.addEventListener('touchend', () => {
+  requestCallPopup('touchend', 180, { autoFromAmount: true });
+});
+
+amountInput.addEventListener('click', () => {
+  requestCallPopup('click', 180, { autoFromAmount: true });
+});
+
+amountInput.addEventListener('input', () => {
+  requestCallPopup('input', 0, { autoFromAmount: true });
+});
+
+form.addEventListener('focusin', (event) => {
+  if (event.target === amountInput) {
+    requestCallPopup('focusin', 220, { autoFromAmount: true });
+  }
 });
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
 
   const payload = collectFormData();
-  console.log('Form submitted:', payload);
+  logWebRtc('info', 'Form submit clicked', payload);
 
-  statusBanner.classList.remove('hidden');
-  statusBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const requiredValidation = validateRequiredFields(payload);
+  if (!requiredValidation.valid) {
+    showStatusBanner(
+      'error',
+      `Please complete required fields: ${requiredValidation.missingFields.join(' and ')}.`
+    );
+    return;
+  }
+
+  clearPendingCallPopupTrigger();
+  hideCallPopup();
+  pendingSubmissionPayload = payload;
+  showCallbackPopup();
+});
+
+window.addEventListener('error', (event) => {
+  appendInAppLog('error', 'Window error', {
+    message: event.message,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+  });
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  appendInAppLog('error', 'Unhandled promise rejection', event.reason);
+});
+
+appendInAppLog('info', 'App initialized', {
+  isNativePlatform,
+  apiBaseUrl,
 });
 
 window.addEventListener('beforeunload', () => {

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:gh": "VITE_NEWO_API_BASE_URL=https://app.newo.ai vite build",
+    "build:gh": "VITE_DEPLOY_TARGET=github-pages VITE_NEWO_API_BASE_URL=https://app.newo.ai vite build",
     "preview": "vite preview",
     "predeploy": "pnpm run build",
     "deploy": "gh-pages -d dist",
