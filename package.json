@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:gh": "VITE_NEWO_API_BASE_URL=https://app.newo.ai vite build",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "predeploy": "pnpm run build",
+    "deploy": "gh-pages -d dist",
+    "deploy:gh": "pnpm run build:gh && gh-pages -d dist"
   },
   "repository": {
     "type": "git",
@@ -16,6 +18,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "packageManager": "pnpm@10.18.2",
   "bugs": {
     "url": "https://github.com/khoilya/iclub-demo-app/issues"
   },

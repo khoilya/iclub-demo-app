@@ -24,9 +24,6 @@
       };
     </script>
 
-    <!-- Newo Web Call Widget -->
-    <script src="https://cdn.newo.ai/webcall-widget/widget.umd.min.js"></script>
-
     <style>
       /* Prevent pull-to-refresh on mobile */
       body { overscroll-behavior-y: contain; }
@@ -102,6 +99,19 @@
             />
           </div>
 
+          <!-- Phone -->
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5" for="phone">Phone Number</label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              placeholder="+1 (555) 123-4567"
+              autocomplete="tel"
+              class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-sm placeholder-slate-500 focus:border-brand focus:ring-2 focus:ring-brand/30 transition"
+            />
+          </div>
+
           <!-- Investment Amount — focusing this field triggers the AI call popup -->
           <div>
             <label class="block text-xs font-medium text-slate-300 mb-1.5" for="amount">
@@ -169,6 +179,31 @@
       </div>
 
     </div><!-- /App Shell -->
+
+    <!-- ─────────────────────────────────────────────────────────
+         Active Call Controls
+    ───────────────────────────────────────────────────────── -->
+    <div
+      id="call-controls"
+      class="hidden fixed bottom-4 inset-x-4 z-40"
+      role="region"
+      aria-label="Active call controls"
+    >
+      <div class="mx-auto w-full max-w-md bg-slate-800/95 border border-slate-600 rounded-2xl shadow-2xl backdrop-blur p-4">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <p class="text-[10px] uppercase tracking-wide text-slate-400">AI Call</p>
+            <p id="call-status-text" class="text-sm text-slate-200">Connecting to AI consultant...</p>
+          </div>
+          <button
+            id="btn-hangup"
+            class="bg-rose-600 hover:bg-rose-500 active:scale-95 transition-all rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-900/40"
+          >
+            End Call
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- ─────────────────────────────────────────────────────────
          AI Consultant Call Popup
@@ -245,8 +280,8 @@
       </div>
     </div>
 
-    <!-- Newo Widget container (invisible host element) -->
-    <div id="call-widget-container"></div>
+    <!-- Remote audio sink for direct WebRTC -->
+    <audio id="remote-audio" autoplay playsinline class="hidden"></audio>
 
     <script type="module" src="/main.js"></script>
   </body>
